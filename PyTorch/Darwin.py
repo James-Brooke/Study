@@ -631,8 +631,8 @@ def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5
             if counter == 10: break
             ax = fig.add_subplot(3,3, counter)
             if adversarial:
-                image, _, _ = adv_func(best_model, batch[0][i].view(1,1,28,28).cuda(),
-                                   batch[1][i].view(1), eps=eps, batch=False)      
+                image = adv_func(best_model, batch[0][i].view(1,1,28,28).cuda(),
+                                   batch[1][i].view(1), eps=eps)      
             else:
                 image = batch[0][i].cuda()
             softmax = np.exp(best_model(image.view(1,1,28,28)).detach().cpu().numpy())

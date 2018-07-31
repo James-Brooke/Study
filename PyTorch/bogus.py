@@ -16,7 +16,7 @@ class atk:
             self.grads[name] = grad
         return hook
 
-    def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1, batch=True): #https://arxiv.org/pdf/1412.6572.pdf
+    def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1): #https://arxiv.org/pdf/1412.6572.pdf
         
         x_adv = Variable(x.data, requires_grad=True).cuda() #clean image
         x_adv.register_hook(self.save_grad('x_adv'))
@@ -33,11 +33,5 @@ class atk:
         x_adv = x_adv + (eps*self.grads['x_adv'].sign())
         x_adv = torch.clamp(x_adv, x_val_min, x_val_max)
         
-        if batch == False:
-            with torch.no_grad():
-                h = model(x)
-                h_adv = model(x_adv)
-
-            return x_adv, h_adv, h
         
         return x_adv
