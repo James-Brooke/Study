@@ -582,3 +582,20 @@ def get_best_model(optimizer, adversarial=True):
     adv_score = optimizer.test_results[best_gen]['correct'][best_pos]
                 
     return [best_gen, clean_score, adv_score, rebuild_from_save(optimizer, best_gen, best_pos)]
+
+def best_printer(optimizer):
+    holdict = {}
+    holdict['best_clean'] = {}
+    holdict['best_adversarial'] = {}
+    
+    holdict['best_clean']['generation'] , \
+    holdict['best_clean']['clean'], \
+    holdict['best_clean']['adversarial'], _ = get_best_model(testing2, adversarial=False)
+    
+    holdict['best_adversarial']['generation'] , \
+    holdict['best_adversarial']['clean'], \
+    holdict['best_adversarial']['adversarial'], _ = get_best_model(testing2, adversarial=True)
+    
+    return pd.DataFrame(holdict).T
+
+
