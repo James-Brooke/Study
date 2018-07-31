@@ -540,4 +540,14 @@ def avgplotter(optimizer):
         for j in range(gens):
             ax.scatter(j, holder[list(holder.keys())[i]][j], c='black')
 
-            
+
+def rebuild_from_save(optimizer, generation, position):
+    
+    genome = optimizer.genome_history[generation][position]
+    
+    net = NetFromBuildInfo(genome)
+    
+    net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\{}-{}".format(generation, position)))
+    
+    return net.cuda()
+
