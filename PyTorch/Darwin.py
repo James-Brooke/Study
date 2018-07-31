@@ -432,3 +432,52 @@ def diffplotter(optimizer):
         
     for item in (ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(15)
+
+def bestplotter(optimizer, k=0):
+
+    holder = {
+        'clean accuracy' : [],
+        'adversarial accuracy' : [],
+        'number of layers' : [],
+        'activation function' : [],
+        'dropout rate' : [],
+        'optimizer' : [],
+        'number of units in layer' : [],
+        'learning rate' : [],
+    }
+
+    for gen in optimizer.test_results:
+
+        curr = optimizer.test_results[gen]
+
+        best_index = np.argsort(curr['correct'])[::-1][k]
+
+        holder['clean accuracy'].append(curr['clean_correct'][best_index])
+        holder['adversarial accuracy'].append(curr['correct'][best_index])
+
+        genome = optimizer.genome_history[gen][best_index]
+
+        holder['number of layers'].append(genome['nb_layers'])
+        holder['dropout rate'].append(genome['layers'][0]['dropout_rate'])
+        holder['number of units in layer'].append(genome['layers'][0]['nb_units'])
+        holder['optimizer'].append(genome['optimizer'])
+        holder['activation function'].append(genome['layers'][0]['activation'])
+        holder['learning rate'].append(genome['lr'])
+        
+    gens = len(holder['clean accuracy'])
+    
+    fig = plt.figure(figsize=(20,20))
+    
+    for i in range(8):
+        ax = fig.add_subplot(4,2, i+1)
+        ax.set_ylabel(list(holder.keys())[i])
+        ax.set_xlabel('Generation')
+        ax.set_xticks(np.arange(0, gens,5))
+        ax.yaxis.label.set_fontsize(15)
+        
+        
+        
+        for j in range(gens):
+            ax.scatter(j, holder[list(holder.keys())[i]][j], c='black')
+
+
