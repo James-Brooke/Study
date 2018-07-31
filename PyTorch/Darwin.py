@@ -551,3 +551,18 @@ def rebuild_from_save(optimizer, generation, position):
     
     return net.cuda()
 
+def sanity_check(optimizer, test_loader):
+    
+    for generation in optimizer.test_results:
+        print('generation {}: \n'.format(generation))
+        for i, result in enumerate(optimizer.test_results[generation]['correct']):
+            
+            mod = rebuild_from_save(optimizer, generation, i)
+            _, rebuild_result = test(mod, test_loader, adversarial=True, eps=0.5)
+            
+            if result == rebuild_result:
+                print("result = {}, rebuild result = {}. (equal)".format(result, rebuild_result))
+            else:
+                print("result = {}, rebuild result = {}. (different!!)".format(result, rebuild_result))
+
+
