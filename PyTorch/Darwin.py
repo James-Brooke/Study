@@ -671,3 +671,45 @@ def dataframer(optimizer):
                           'Lr', 'Act_func', 'Nb_units', 'Dropout', 'Genome']
     
     return df
+
+
+def int_plot(x, y, x2, y2, gen):
+    if gen == 'all':
+        source = ColumnDataSource(df.iloc[:, :-1])#last column contains dicts which causes bokeh to fail
+    else: 
+        source = ColumnDataSource(df[df['Generation']==gen].iloc[:, :-1]) 
+    
+    tiplist = [("Accuracy", "@Clean"), 
+            ("Adversarial accuracy", "@Adversarial"),
+            ("Number of layers", "@No_layers"),
+            ("Generation", "@Generation"),
+            ("Activation function", "@Act_func"),
+              ("Dropout", "@Dropout")]
+    
+    options = dict(plot_width=400, plot_height=400,
+                   tools="pan,wheel_zoom,box_zoom,box_select,lasso_select",
+                  active_scroll= 'wheel_zoom')
+
+    p1 = figure(title="{} vs {}".format(y, x), **options)
+    p1.scatter(x, y, color="blue", source=source,
+               hover_line_color="black")#, radius=0.1)
+    p1.xaxis.axis_label = x
+    p1.yaxis.axis_label = y
+    if y in ['Adversarial', 'Clean']:
+        p1.y_range.start = -1000
+        p1.y_range.end = 11000
+    p1.add_tools(HoverTool(tooltips=tiplist))
+
+    p2 = figure(title="{} vs {}".format(y2, x2), **options)
+    p2.scatter(x2, y2, color="green", source=source, 
+               hover_line_color="black")#, radius=0.1)
+    p2.xaxis.axis_label = x2
+    p2.yaxis.axis_label = y2
+    if y2 in ['Adversarial', 'Clean']:
+        p2.y_range.start = -1000
+        p2.y_range.end = 11000
+    p2.add_tools(HoverTool(tooltips=tiplist))
+
+    p = gridplot([[ p1, p2]], toolbar_location="left")
+
+    show(p)
