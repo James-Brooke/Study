@@ -598,4 +598,38 @@ def best_printer(optimizer):
     
     return pd.DataFrame(holdict).T
 
+def multi_plot(optimizer, data_loader, adversarial=False, eps=0.5):
+    
+    best_gen, best_clean_score, best_adv_score, best_model = get_best_model(optimizer)
+    batch = next(iter(data_loader))
+    
+    print("Showing best model which was found in generation {}\n"
+          "Clean accuracy = {}\nadversarial accuracy ={}\n\n"
+         "Model: \n\n".format(best_gen, best_clean_score,
+                           best_adv_score), best_model, "\n\n",
+          "Images below are {}"
+          .format('adversarial' if adversarial else 'clean'))
+
+    fig = plt.figure(figsize=(20,20))
+
+    counter=0
+    for i in range(len(batch[1])):
+        if batch[1][i].item() == counter:
+            #do stuff
+            counter+=1
+            if counter == 10: break
+            ax = fig.add_subplot(3,3, counter)
+            if adversarial:
+                image, _, _ = fgsm(best_model, batch[0][i].view(1,1,28,28).cuda(),
+                                   batch[1][i].view(1), eps=eps, batch=False)      
+            else:
+                image = batch[0][i]
+            softmax = F.softmax(best_model(image.view(1,1,28,28).cuda()), dim=1)
+            prediction = softmax.argmax()
+            prediction_pct = softmax.max()
+            ax.imshow(image.detach().cpu().numpy().reshape(28,28))
+            ax.text(x=3, y=31, s="Predicted: {x} ({y:.2f})"
+                     .format(x=prediction, y=prediction_pct), fontsize=20)
+
+
 
