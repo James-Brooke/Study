@@ -566,3 +566,19 @@ def sanity_check(optimizer, test_loader):
                 print("result = {}, rebuild result = {}. (different!!)".format(result, rebuild_result))
 
 
+def get_best_model(optimizer, adversarial=True):
+    current_best = 0
+    for i, gen in enumerate(optimizer.test_results):
+        if adversarial: 
+            generation_correct = optimizer.test_results[gen]['correct']
+        else:
+            generation_correct = optimizer.test_results[gen]['clean_correct']
+        for j, score in enumerate(generation_correct):
+            if score > current_best:
+                best_gen = gen
+                best_pos = j
+                current_best = score
+    clean_score = optimizer.test_results[best_gen]['clean_correct'][best_pos]
+    adv_score = optimizer.test_results[best_gen]['correct'][best_pos]
+                
+    return [best_gen, clean_score, adv_score, rebuild_from_save(optimizer, best_gen, best_pos)]
