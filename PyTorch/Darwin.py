@@ -363,3 +363,72 @@ class TournamentOptimizer:
         self.test_results[self.generation]['clean_correct'] = clean_corrects
 
 
+def progressplotter(optimizer, clean=False):
+    
+    if clean:
+        dataset = 'clean_correct'
+    else:
+        dataset = 'correct'
+    
+    means = []
+    
+    fig = plt.figure(figsize=(20,10))
+    ax = fig.add_subplot(111)
+    
+    gens = range(len(optimizer.test_results))
+    popsize = len(optimizer.test_results[1][dataset])
+    
+    for i in gens:
+        ax.scatter([i for j in range(popsize)], optimizer.test_results[i+1][dataset])
+        mean = np.mean(optimizer.test_results[i+1][dataset])
+        means.append(mean)
+        ax.scatter(i, mean, c=1)
+        
+        if i == 0:
+            continue
+        plt.plot([i-1, i], [means[i-1], mean], c='black')
+        
+    ax.set_xticks(np.arange(0, len(means),1))
+    ax.set_xlabel('Generation')
+    ax.set_ylabel('Correct classifications')
+    
+    if clean:
+        ax.set_title('Accuracy on clean dataset')
+    else:
+        ax.set_title('Accuracy on adversarial dataset')
+    
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label]):
+        item.set_fontsize(30)
+        
+    for item in (ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(15)
+
+def diffplotter(optimizer):
+    diff = {}
+    for gen in optimizer.test_results:
+        diff[gen] = []
+        for i in range(len(optimizer.test_results[gen]['clean_correct'])):
+            clean = optimizer.test_results[gen]['clean_correct'][i]
+            adver = optimizer.test_results[gen]['correct'][i]
+            diff[gen].append(clean - adver)
+            
+    fig = plt.figure(figsize=(20,10))
+    ax = fig.add_subplot(111)
+
+    gens = len(optimizer.test_results)
+    popsize = len(optimizer.test_results[gen]['clean_correct'])
+
+    for i in range(gens):
+        ax.scatter([i for j in range(popsize)], diff[i+1])
+        
+    ax.set_title('Difference between clean and adversarial accuracy')
+    ax.set_xlabel('Generation')
+    ax.set_ylabel('Clean accuracy - adversarial accuracy')
+    
+    ax.set_xticks(np.arange(0, gens,1))
+    
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label]):
+        item.set_fontsize(30)
+        
+    for item in (ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(15)
