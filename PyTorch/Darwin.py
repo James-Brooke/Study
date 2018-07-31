@@ -244,7 +244,7 @@ class TournamentOptimizer:
     """Define a tournament play selection process."""
 
     def __init__(self, population_sz, layer_space, net_space, init_fn, mutate_fn, builder_fn,
-                 train_fn, test_fn, data_loader, test_loader, adv_func):
+                 train_fn, test_fn, data_loader, test_loader, adv_func, telegram_credentials):
         
         self.init_fn = init_fn
         self.layer_space = layer_space
@@ -257,6 +257,8 @@ class TournamentOptimizer:
         self.testloader = test_loader
         self.population_sz = population_sz
         self.adv_func = adv_func
+        self.bot_token = telegram_credentials[0]
+        self.bot_channel = telegram_credentials[1]
         
         torch.manual_seed(1)
         
@@ -268,8 +270,18 @@ class TournamentOptimizer:
 
         self.generation = 0
 
-    def step(self, generations=1, save=True, phone=False):
-        """Tournament evolution step."""
+    def step(self, generations=1, epochs=5, save=True, phone=False):
+        """Tournament evolution step.
+            will train neural networks and select best for progress to
+            next generation.
+
+            Args: 
+
+            generations: number of generations to train and select from.
+            epochs: number of epochs to train each individual network. 
+            save: saves network parameters to disk.
+            phone: pushes training progress notifications to telegram bot. 
+        """
 
         for _ in tnrange(generations, desc='Overall progress'): #tqdm progress bar
 
@@ -280,7 +292,7 @@ class TournamentOptimizer:
             self.children = []
             
 
-            self.train_nets(save=save)
+            self.train_nets(save=save, epochs=epochs)
             self.evaluate_nets()
 
             mean = np.mean(self.test_results[self.generation]['correct'])
@@ -291,8 +303,8 @@ class TournamentOptimizer:
             
             if phone: #update via telegram
                 requests.post("https://api.telegram.org/bot{}/"
-                  "sendMessage".format(BOT_TOKEN), 
-                  data={'chat_id': '{}'.format(CHANNEL),
+                  "sendMessage".format(self.bot_token), 
+                  data={'chat_id': '{}'.format(self.bot_channel),
                     'text':'Generation {} completed \n'
                         'Population mean: {} max: {}'
                         .format(self.generation, mean, best)})
@@ -342,11 +354,11 @@ class TournamentOptimizer:
 
         
         
-    def train_nets(self, save=True):
+    def train_nets(self, save=True, epochs=5):
         """trains population of nets"""
          
         for i, net in enumerate(tqdm_notebook(self.population)):
-            for epoch in range(1, 2):
+            for epoch in range(1, epochs+1):
                 torch.manual_seed(1)
                 self.train(net, self.dataloader, net.optimizer, epoch)
                 
@@ -640,6 +652,7 @@ def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5
             else:
                 image = batch[0][i].cuda()
             softmax = np.exp(best_model(image.view(1,1,28,28)).detach().cpu().numpy())
+            print(softmax)
             prediction = softmax.argmax()
             prediction_pct = softmax.max()
             ax.imshow(image.detach().cpu().numpy().reshape(28,28), cmap='Greys')
