@@ -481,3 +481,63 @@ def bestplotter(optimizer, k=0):
             ax.scatter(j, holder[list(holder.keys())[i]][j], c='black')
 
 
+def avgplotter(optimizer):
+
+    holder = {
+        'clean accuracy' : [],
+        'adversarial accuracy' : [],
+        'number of layers' : [],
+        'activation function' : [],
+        'dropout rate' : [],
+        'optimizer' : [],
+        'number of units in layer' : [],
+        'learning rate' : [],
+    }
+
+    for gen in optimizer.test_results:
+
+        curr = optimizer.test_results[gen]
+        genomes = optimizer.genome_history[gen]
+        
+        templist1 = []
+        templist2 = []
+        templist3 = []
+        templist4 = []
+        templist5 = []
+        templist6 = []
+        for net in genomes:
+            templist1.append(net['nb_layers'])
+            templist2.append(net['optimizer'])
+            templist3.append(net['lr'])
+            templist4.append(net['layers'][0]['dropout_rate'])
+            templist5.append(net['layers'][0]['nb_units'])
+            templist6.append(net['layers'][0]['activation'])
+            
+            
+        holder['number of layers'].append(np.mean(templist1))
+        holder['optimizer'].append(Counter(templist2).most_common()[0][0])
+        holder['learning rate'].append(np.mean(templist3))
+        holder['dropout rate'].append(np.mean(templist4))
+        holder['number of units in layer'].append(np.mean(templist5))
+        holder['activation function'].append(Counter(templist6).most_common()[0][0])
+        
+
+        holder['clean accuracy'].append(np.mean(curr['clean_correct']))
+        holder['adversarial accuracy'].append(np.mean(curr['correct']))
+            
+
+    gens = len(holder['clean accuracy'])
+    
+    fig = plt.figure(figsize=(20,20))
+    
+    for i in range(8):
+        ax = fig.add_subplot(4,2, i+1)
+        ax.set_ylabel(list(holder.keys())[i])
+        ax.set_xlabel('Generation')
+        ax.set_xticks(np.arange(0, gens,5))
+        ax.yaxis.label.set_fontsize(15)
+        
+        for j in range(gens):
+            ax.scatter(j, holder[list(holder.keys())[i]][j], c='black')
+
+            
