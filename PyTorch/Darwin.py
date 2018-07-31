@@ -13,9 +13,13 @@ import matplotlib.pyplot as plt
 
 from collections import Counter
 from torch.autograd import Variable
-from torchvision import datasets, transforms
 from operator import itemgetter
 from tqdm import tqdm, tnrange, tqdm_notebook
+
+from bokeh.plotting import figure 
+from bokeh.io import output_notebook, show
+from bokeh.models import ColumnDataSource, HoverTool, WheelZoomTool
+from bokeh.layouts import gridplot
 
 
 def random_value(space):
@@ -243,7 +247,7 @@ class TournamentOptimizer:
         self.testloader = test_loader
         self.population_sz = population_sz
         
-        torch.manual_seed(1);
+        torch.manual_seed(1)
         
         self.genomes = [init_fn(self.layer_space, self.net_space) for i in range(population_sz)]   
         self.population = []
@@ -332,7 +336,7 @@ class TournamentOptimizer:
          
         for i, net in enumerate(tqdm_notebook(self.population)):
             for epoch in range(1, 5):
-                torch.manual_seed(1);
+                torch.manual_seed(1)
                 self.train(net, self.dataloader, net.optimizer, epoch)
                 
             if save:
