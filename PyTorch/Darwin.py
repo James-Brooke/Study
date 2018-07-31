@@ -632,4 +632,42 @@ def multi_plot(optimizer, data_loader, adversarial=False, eps=0.5):
                      .format(x=prediction, y=prediction_pct), fontsize=20)
 
 
+def dataframer(optimizer):
+    
+    number_of_layers = []
+    learning_rate = []
+    act_func = []
+    number_of_units_1 = []
+    dropout_rate = []
+    genome_hist = []
+    generations = []
+    clean_scores = []
+    adv_scores = []
+    
+    for generation in optimizer.test_results:
 
+        scores = optimizer.test_results[generation]
+        genomes = optimizer.genome_history[generation]
+
+        clean_scores += scores['clean_correct']
+        adv_scores += scores['correct']
+
+        for genome in genomes:
+            
+            generations.append(generation)
+            genome_hist.append(genome)
+            number_of_layers.append(genome['nb_layers'])
+            learning_rate.append(genome['lr'])
+
+            act_func.append(genome['layers'][0]['activation'])
+            number_of_units_1.append(genome['layers'][0]['nb_units'])
+            dropout_rate.append(genome['layers'][0]['dropout_rate'])
+
+            df = pd.DataFrame([generations, clean_scores, adv_scores, number_of_layers,
+                             learning_rate, act_func, 
+                             number_of_units_1, dropout_rate, genome_hist]).T
+
+            df.columns = ['Generation', 'Clean','Adversarial','No_layers',
+                          'Lr', 'Act_func', 'Nb_units', 'Dropout', 'Genome']
+    
+    return df
