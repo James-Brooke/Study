@@ -195,3 +195,171 @@ def train(model, train_loader, optimizer, epoch):
     if epoch % 100 == 0:
         print('Train Epoch: {} \t Loss: {:.6f}'.format(epoch, running_loss ))
 
+def test(model, test_loader, adversarial=False, eps=0.5):
+    
+    model.train(False)
+    
+    test_loss = 0
+    correct = 0
+    
+    if adversarial:
+        for data, target in test_loader:
+            data, target = data.cuda(), target.cuda()
+            data= fgsm(model, data, target, eps=eps)
+            output = model(data)
+            pred = output.max(1, keepdim=True)[1]
+            correct += pred.eq(target.view_as(pred).cuda()).sum().item()
+            test_loss += F.nll_loss(output, target, size_average=False).item()
+        
+    else:
+        with torch.no_grad():
+            for data, target in test_loader:
+                data, target = data.cuda(), target.cuda()
+                output = model(data)
+                test_loss += F.nll_loss(output, target, size_average=False).item()
+                pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+                correct += pred.eq(target.view_as(pred)).sum().item()
+
+    test_loss /= len(test_loader.dataset)
+    
+    
+    return (test_loss, correct)
+
+
+class TournamentOptimizer:
+    """Define a tournament play selection process."""
+
+    def __init__(self, population_sz, layer_space, net_space, init_fn, mutate_fn, builder_fn,
+                 train_fn, test_fn, data_loader, test_loader):
+        
+        self.init_fn = init_fn
+        self.layer_space = layer_space
+        self.net_space = net_space
+        self.mutate_fn = mutate_fn
+        self.builder_fn = builder_fn
+        self.train = train_fn
+        self.test = test_fn
+        self.dataloader = data_loader
+        self.testloader = test_loader
+        self.population_sz = population_sz
+        
+        torch.manual_seed(1);
+        
+        self.genomes = [init_fn(self.layer_space, self.net_space) for i in range(population_sz)]   
+        self.population = []
+        
+        self.test_results = {} 
+        self.genome_history = {} 
+
+        self.generation = 0
+
+    def step(self, generations=1, save=True, phone=False):
+        """Tournament evolution step."""
+
+        for _ in tnrange(generations, desc='Overall progress'): #tqdm progress bar
+
+            self.generation += 1
+
+            self.genome_history[self.generation] = self.genomes
+            self.population = [NetFromBuildInfo(i).cuda() for i in self.genomes]
+            self.children = []
+            
+
+            self.train_nets(save=save)
+            self.evaluate_nets()
+
+            mean = np.mean(self.test_results[self.generation]['correct'])
+            best = np.max(self.test_results[self.generation]['correct'])
+
+            tqdm.write('Generation {} Population mean:{} max:{}'
+                       .format(self.generation, mean, best))
+            
+            if phone: #update via telegram
+                requests.post("https://api.telegram.org/bot{}/"
+                  "sendMessage".format(BOT_TOKEN), 
+                  data={'chat_id': '{}'.format(CHANNEL),
+                    'text':'Generation {} completed \n'
+                        'Population mean: {} max: {}'
+                        .format(self.generation, mean, best)})
+
+                
+                
+
+            n_elite = 2
+            sorted_pop = np.argsort(self.test_results[self.generation]['correct'])[::-1]
+            elite = sorted_pop[:n_elite]
+            
+            # elites always included in the next population
+            self.elite = []
+            print('\nTop performers:')
+            for no, i in enumerate(elite):
+                self.elite.append((self.test_results[self.generation]['correct'][i], 
+                                   self.population[i]))    
+
+                self.children.append(self.genomes[i])
+
+                tqdm.write("{}: score:{}".format(no,
+                            self.test_results[self.generation]['correct'][i]))   
+
+
+
+
+            #https://stackoverflow.com/questions/31933784/tournament-selection-in-genetic-algorithm
+            p = 0.85 # winner probability 
+            tournament_size = 3
+            probs = [p*((1-p)**i) for i in range(tournament_size-1)]
+            probs.append(1-np.sum(probs))
+            #probs = [0.85, 0.1275, 0.0224]
+
+            while len(self.children) < self.population_sz:
+                pop = range(len(self.population))
+                sel_k = random.sample(pop, k=tournament_size)
+                fitness_k = list(np.array(self.test_results[self.generation]['correct'])[sel_k])
+                selected = zip(sel_k, fitness_k)
+                rank = sorted(selected, key=itemgetter(1), reverse=True)
+                pick = np.random.choice(tournament_size, size=1, p=probs)[0]
+                best = rank[pick][0]
+                genome = self.mutate_fn(self.genomes[best], self.layer_space, self.net_space)
+                self.children.append(genome)
+                
+            self.genomes = self.children
+                
+
+        
+        
+    def train_nets(self, save=True):
+        """trains population of nets"""
+         
+        for i, net in enumerate(tqdm_notebook(self.population)):
+            for epoch in range(1, 5):
+                torch.manual_seed(1);
+                self.train(net, self.dataloader, net.optimizer, epoch)
+                
+            if save:
+                fp = r"D:\Models\NeuroEvolution/{}-{}".format(self.generation, i)
+                torch.save(net.state_dict(), fp)
+                
+                
+    def evaluate_nets(self):
+        """evaluate the models."""
+        
+        losses = []
+        corrects = []
+        clean_corrects = []
+        
+        self.test_results[self.generation] = {}
+        
+        for i in range(len(self.population)):
+            net = self.population[i]
+            loss, correct = self.test(net, self.testloader, adversarial=True, eps=0.5) 
+            _, clean_correct = self.test(net, self.testloader)
+            
+            losses.append(loss)
+            corrects.append(correct)
+            clean_corrects.append(clean_correct)
+        
+        self.test_results[self.generation]['losses'] = losses
+        self.test_results[self.generation]['correct'] = corrects
+        self.test_results[self.generation]['clean_correct'] = clean_corrects
+
+
