@@ -170,4 +170,28 @@ class NetFromBuildInfo(nn.Module):
         return F.log_softmax(x, dim=1)
 
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def train(model, train_loader, optimizer, epoch):
+    
+    model.train(True)
+    
+    running_loss = 0.0
+    
+    for batch_idx, (data, target) in enumerate(train_loader):
+        
+        data, target = Variable(data.cuda()), Variable(target.cuda())
+        optimizer.zero_grad()
+        output = model(data)
+        loss = F.nll_loss(output, target)
+        loss.backward() 
+        optimizer.step()
+        running_loss += loss.item()
+
+    running_loss /= len(train_loader.dataset)    
+    
+    if epoch % 100 == 0:
+        print('Train Epoch: {} \t Loss: {:.6f}'.format(epoch, running_loss ))
 
