@@ -199,8 +199,14 @@ def train(model, train_loader, optimizer, epoch):
     if epoch % 100 == 0:
         print('Train Epoch: {} \t Loss: {:.6f}'.format(epoch, running_loss ))
 
-def test(model, test_loader, adversarial=False, eps=0.5):
-    
+def test(model, test_loader, adv_func=None, adversarial=False, eps=0.5):
+    """
+    Test model
+
+    Args:
+    test_loader: a PyTorch dataloader to test on
+    adv_func: a function that returns adversarial examples 
+    """
     model.train(False)
     
     test_loss = 0
@@ -209,7 +215,7 @@ def test(model, test_loader, adversarial=False, eps=0.5):
     if adversarial:
         for data, target in test_loader:
             data, target = data.cuda(), target.cuda()
-            data= fgsm(model, data, target, eps=eps)
+            data= adv_func(model, data, target, eps=eps)
             output = model(data)
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred).cuda()).sum().item()
@@ -234,7 +240,7 @@ class TournamentOptimizer:
     """Define a tournament play selection process."""
 
     def __init__(self, population_sz, layer_space, net_space, init_fn, mutate_fn, builder_fn,
-                 train_fn, test_fn, data_loader, test_loader):
+                 train_fn, test_fn, data_loader, test_loader, adv_func):
         
         self.init_fn = init_fn
         self.layer_space = layer_space
@@ -246,6 +252,7 @@ class TournamentOptimizer:
         self.dataloader = data_loader
         self.testloader = test_loader
         self.population_sz = population_sz
+        self.adv_func = adv_func
         
         torch.manual_seed(1)
         
@@ -335,7 +342,7 @@ class TournamentOptimizer:
         """trains population of nets"""
          
         for i, net in enumerate(tqdm_notebook(self.population)):
-            for epoch in range(1, 5):
+            for epoch in range(1, 2):
                 torch.manual_seed(1)
                 self.train(net, self.dataloader, net.optimizer, epoch)
                 
@@ -355,7 +362,8 @@ class TournamentOptimizer:
         
         for i in range(len(self.population)):
             net = self.population[i]
-            loss, correct = self.test(net, self.testloader, adversarial=True, eps=0.5) 
+            loss, correct = self.test(net, self.testloader, adv_func=self.adv_func,
+                                    adversarial=True, eps=0.5) 
             _, clean_correct = self.test(net, self.testloader)
             
             losses.append(loss)
@@ -594,15 +602,15 @@ def best_printer(optimizer):
     
     holdict['best_clean']['generation'] , \
     holdict['best_clean']['clean'], \
-    holdict['best_clean']['adversarial'], _ = get_best_model(testing2, adversarial=False)
+    holdict['best_clean']['adversarial'], _ = get_best_model(optimizer, adversarial=False)
     
     holdict['best_adversarial']['generation'] , \
     holdict['best_adversarial']['clean'], \
-    holdict['best_adversarial']['adversarial'], _ = get_best_model(testing2, adversarial=True)
+    holdict['best_adversarial']['adversarial'], _ = get_best_model(optimizer, adversarial=True)
     
     return pd.DataFrame(holdict).T
 
-def multi_plot(optimizer, data_loader, adversarial=False, eps=0.5):
+def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5):
     
     best_gen, best_clean_score, best_adv_score, best_model = get_best_model(optimizer)
     batch = next(iter(data_loader))
@@ -618,22 +626,21 @@ def multi_plot(optimizer, data_loader, adversarial=False, eps=0.5):
 
     counter=0
     for i in range(len(batch[1])):
-        if batch[1][i].item() == counter:
-            #do stuff
+        if batch[1][i].item() == counter: #find first digit that is off the correct class for position
             counter+=1
             if counter == 10: break
             ax = fig.add_subplot(3,3, counter)
             if adversarial:
-                image, _, _ = fgsm(best_model, batch[0][i].view(1,1,28,28).cuda(),
+                image, _, _ = adv_func(best_model, batch[0][i].view(1,1,28,28).cuda(),
                                    batch[1][i].view(1), eps=eps, batch=False)      
             else:
-                image = batch[0][i]
-            softmax = F.softmax(best_model(image.view(1,1,28,28).cuda()), dim=1)
+                image = batch[0][i].cuda()
+            softmax = np.exp(best_model(image.view(1,1,28,28)).detach().cpu().numpy())
             prediction = softmax.argmax()
             prediction_pct = softmax.max()
-            ax.imshow(image.detach().cpu().numpy().reshape(28,28))
-            ax.text(x=3, y=31, s="Predicted: {x} ({y:.2f})"
-                     .format(x=prediction, y=prediction_pct), fontsize=20)
+            ax.imshow(image.detach().cpu().numpy().reshape(28,28), cmap='Greys')
+            ax.text(x=3, y=31, s="Predicted: {x} ({y:.2f}%)"
+                     .format(x=prediction, y=100 *prediction_pct), fontsize=20)
 
 
 def dataframer(optimizer):
@@ -677,7 +684,7 @@ def dataframer(optimizer):
     return df
 
 
-def int_plot(x, y, x2, y2, gen):
+def int_plot(df, x, y, x2, y2, gen):
     if gen == 'all':
         source = ColumnDataSource(df.iloc[:, :-1])#last column contains dicts which causes bokeh to fail
     else: 
