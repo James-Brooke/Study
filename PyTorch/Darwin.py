@@ -150,6 +150,10 @@ class NetFromBuildInfo(nn.Module):
             'logits',
             nn.Linear(previous_units, 10) #10 MNIST classes
             )
+        self.model.add_module(
+            'log_softmax',
+            nn.LogSoftmax(dim=1)
+        )
         
         
         ##OPTIMIZER
@@ -171,7 +175,7 @@ class NetFromBuildInfo(nn.Module):
         
     def forward(self, x):
         x = self.model(x)
-        return F.log_softmax(x, dim=1)
+        return x
 
 
 def count_parameters(model):
@@ -626,7 +630,7 @@ def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5
 
     counter=0
     for i in range(len(batch[1])):
-        if batch[1][i].item() == counter: #find first digit that is off the correct class for position
+        if batch[1][i].item() == counter: #find first digit that is the correct class for plot position (0-9)
             counter+=1
             if counter == 10: break
             ax = fig.add_subplot(3,3, counter)
@@ -641,6 +645,7 @@ def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5
             ax.imshow(image.detach().cpu().numpy().reshape(28,28), cmap='Greys')
             ax.text(x=3, y=31, s="Predicted: {x} ({y:.2f}%)"
                      .format(x=prediction, y=100 *prediction_pct), fontsize=20)
+            image=0
 
 
 def dataframer(optimizer):
