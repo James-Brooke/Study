@@ -573,13 +573,25 @@ def avgplotter(optimizer):
             ax.scatter(j, holder[list(holder.keys())[i]][j], c='black')
 
 
-def rebuild_from_save(optimizer, run, generation, position):
-    
-    genome = optimizer.genome_history[generation][position]
-    
-    net = NetFromBuildInfo(genome)
-    
-    net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\run{}/{}-{}".format(run, generation, position)))
+def rebuild_from_save(optimizer, generation, position, run=None):
+
+    if run:
+        df= pd.read_pickle('../data/neuroevolution{}'.format(run))
+        if run == 2:
+            popnums = [j for i in range(100) for j in range(30)] #100 generations in run 2
+        else:
+            popnums = [j for i in range(50) for j in range(30)]
+        df['Popnum'] = popnums
+
+        genome = df[(df['Generation']==generation)&(df['Popnum']==position)].iloc[0,-2]
+        print(genome)
+        net = NetFromBuildInfo(genome)
+        net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\run{}/{}-{}".format(run, generation, position)))
+
+    else:
+        genome = optimizer.genome_history[generation][position]
+        net = NetFromBuildInfo(genome)
+        net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\{}-{}".format(generation, position)))
     
     return net.cuda()
 
