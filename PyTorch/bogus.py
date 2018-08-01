@@ -17,13 +17,15 @@ class atk:
         return hook
 
     def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1): #https://arxiv.org/pdf/1412.6572.pdf
+
+        criterion = torch.nn.CrossEntropyLoss()
         
         x_adv = Variable(x.data, requires_grad=True).cuda() #clean image
         x_adv.register_hook(self.save_grad('x_adv'))
 
         h_adv = model(x_adv) #clean pred
         
-        cost = F.nll_loss(h_adv, y.cuda()) #negative log loss clean image and clean pred
+        cost = criterion(h_adv, y.cuda()) 
 
         if x_adv.grad is not None:
             x_adv.grad.data.fill_(0)

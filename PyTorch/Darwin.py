@@ -151,8 +151,8 @@ class NetFromBuildInfo(nn.Module):
             nn.Linear(previous_units, 10) #10 MNIST classes
             )
         self.model.add_module(
-            'log_softmax',
-            nn.LogSoftmax(dim=1)
+            'softmax',
+            nn.Softmax(dim=-1)
         )
         
         
@@ -188,12 +188,14 @@ def train(model, train_loader, optimizer, epoch):
     
     running_loss = 0.0
     
+    criterion = nn.CrossEntropyLoss()
+
     for batch_idx, (data, target) in enumerate(train_loader):
         
         data, target = Variable(data.cuda()), Variable(target.cuda())
         optimizer.zero_grad()
         output = model(data)
-        loss = F.nll_loss(output, target)
+        loss = criterion(output, target)
         loss.backward() 
         optimizer.step()
         running_loss += loss.item()
@@ -215,6 +217,8 @@ def test(model, test_loader, adv_func=None, adversarial=False, eps=0.5):
     
     test_loss = 0
     correct = 0
+
+    criterion = nn.CrossEntropyLoss()
     
     if adversarial:
         for data, target in test_loader:
@@ -223,14 +227,14 @@ def test(model, test_loader, adv_func=None, adversarial=False, eps=0.5):
             output = model(data)
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred).cuda()).sum().item()
-            test_loss += F.nll_loss(output, target, size_average=False).item()
+            test_loss += criterion(output, target).item()
         
     else:
         with torch.no_grad():
             for data, target in test_loader:
                 data, target = data.cuda(), target.cuda()
                 output = model(data)
-                test_loss += F.nll_loss(output, target, size_average=False).item()
+                test_loss += criterion(output, target).item()
                 pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
@@ -569,13 +573,13 @@ def avgplotter(optimizer):
             ax.scatter(j, holder[list(holder.keys())[i]][j], c='black')
 
 
-def rebuild_from_save(optimizer, generation, position):
+def rebuild_from_save(optimizer, run, generation, position):
     
     genome = optimizer.genome_history[generation][position]
     
     net = NetFromBuildInfo(genome)
     
-    net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\{}-{}".format(generation, position)))
+    net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\run{}/{}-{}".format(run, generation, position)))
     
     return net.cuda()
 
@@ -626,18 +630,22 @@ def best_printer(optimizer):
     
     return pd.DataFrame(holdict).T
 
-def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5):
+def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5, model=None):
     
-    best_gen, best_clean_score, best_adv_score, best_model = get_best_model(optimizer)
-    batch = next(iter(data_loader))
-    
-    print("Showing best model which was found in generation {}\n"
-          "Clean accuracy = {}\nadversarial accuracy ={}\n\n"
-         "Model: \n\n".format(best_gen, best_clean_score,
-                           best_adv_score), best_model, "\n\n",
-          "Images below are {}"
-          .format('adversarial' if adversarial else 'clean'))
+    if model:
+        best_model=model
+    else:
 
+        best_gen, best_clean_score, best_adv_score, best_model = get_best_model(optimizer)
+        
+        print("Showing best model which was found in generation {}\n"
+            "Clean accuracy = {}\nadversarial accuracy ={}\n\n"
+            "Model: \n\n".format(best_gen, best_clean_score,
+                            best_adv_score), best_model, "\n\n",
+            "Images below are {}"
+            .format('adversarial' if adversarial else 'clean'))
+
+    batch = next(iter(data_loader))
     fig = plt.figure(figsize=(20,20))
 
     counter=0
@@ -651,7 +659,7 @@ def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5
                                    batch[1][i].view(1), eps=eps)      
             else:
                 image = batch[0][i].cuda()
-            softmax = np.exp(best_model(image.view(1,1,28,28)).detach().cpu().numpy())
+            softmax = best_model(image.view(1,1,28,28)).detach().cpu().numpy()
             print(softmax)
             prediction = softmax.argmax()
             prediction_pct = softmax.max()
