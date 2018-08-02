@@ -347,7 +347,7 @@ class TournamentOptimizer:
             while len(self.children) < self.population_sz:
                 pop = range(len(self.population))
                 sel_k = random.sample(pop, k=tournament_size)
-                fitness_k = list(np.array(self.test_results[self.generation]['correct'])[sel_k])
+                fitness_k = list(np.array(self.test_results[self.generation]['correct'])[sel_k] * np.array(self.test_results[self.generation]['clean_correct'])[sel_k])
                 selected = zip(sel_k, fitness_k)
                 rank = sorted(selected, key=itemgetter(1), reverse=True)
                 pick = np.random.choice(tournament_size, size=1, p=probs)[0]
