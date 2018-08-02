@@ -16,7 +16,7 @@ class atk:
             self.grads[name] = grad
         return hook
 
-    def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1): #https://arxiv.org/pdf/1412.6572.pdf
+    def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1, debug=None): #https://arxiv.org/pdf/1412.6572.pdf
 
         criterion = torch.nn.CrossEntropyLoss()
         
@@ -24,13 +24,18 @@ class atk:
         x_adv.register_hook(self.save_grad('x_adv'))
 
         h_adv = model.logits_forward(x_adv) #clean pred
-        
         cost = criterion(h_adv, y.cuda()) 
+        if debug:
+            print('h_adv: ', h_adv, '\n')
+            print('cost: ', cost)
 
         if x_adv.grad is not None:
             x_adv.grad.data.fill_(0)
 
         cost.backward()
+
+        if debug: 
+            print(grads['x_adv'].sign())
 
         x_adv = x_adv + (eps*self.grads['x_adv'].sign())
         x_adv = torch.clamp(x_adv, x_val_min, x_val_max)
