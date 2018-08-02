@@ -20,7 +20,7 @@ class atk:
 
         criterion = torch.nn.CrossEntropyLoss()
         
-        x_adv = Variable(x.data, requires_grad=True).cuda() #clean image
+        x_adv = Variable(x.data, requires_grad=True).cuda().double() #clean image
         x_adv.register_hook(self.save_grad('x_adv'))
 
         h_adv = model(x_adv) #clean pred

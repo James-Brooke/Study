@@ -154,6 +154,8 @@ class NetFromBuildInfo(nn.Module):
             'softmax',
             nn.Softmax(dim=-1)
         )
+
+        self.model = self.model.double()
         
         
         ##OPTIMIZER
@@ -192,7 +194,7 @@ def train(model, train_loader, optimizer, epoch):
 
     for batch_idx, (data, target) in enumerate(train_loader):
         
-        data, target = Variable(data.cuda()), Variable(target.cuda())
+        data, target = Variable(data.cuda().double()), Variable(target.cuda())
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
@@ -222,7 +224,7 @@ def test(model, test_loader, adv_func=None, adversarial=False, eps=0.5):
     
     if adversarial:
         for data, target in test_loader:
-            data, target = data.cuda(), target.cuda()
+            data, target = data.cuda().double(), target.cuda()
             data= adv_func(model, data, target, eps=eps)
             output = model(data)
             pred = output.max(1, keepdim=True)[1]
@@ -232,7 +234,7 @@ def test(model, test_loader, adv_func=None, adversarial=False, eps=0.5):
     else:
         with torch.no_grad():
             for data, target in test_loader:
-                data, target = data.cuda(), target.cuda()
+                data, target = data.cuda().double(), target.cuda()
                 output = model(data)
                 test_loss += criterion(output, target).item()
                 pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
@@ -667,10 +669,10 @@ def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5
             if counter == 10: break
             ax = fig.add_subplot(3,3, counter)
             if adversarial:
-                image = adv_func(best_model, batch[0][i].view(1,1,28,28).cuda(),
+                image = adv_func(best_model, batch[0][i].view(1,1,28,28).cuda().double(),
                                    batch[1][i].view(1), eps=eps)      
             else:
-                image = batch[0][i].cuda()
+                image = batch[0][i].cuda().double()
             softmax = best_model(image.view(1,1,28,28)).detach().cpu().numpy()
             print(softmax)
             prediction = softmax.argmax()
