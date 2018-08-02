@@ -150,10 +150,6 @@ class NetFromBuildInfo(nn.Module):
             'logits',
             nn.Linear(previous_units, 10) #10 MNIST classes
             )
-        self.model.add_module(
-            'softmax',
-            nn.Softmax(dim=-1)
-        )
 
         self.model = self.model.double()
         
@@ -176,6 +172,10 @@ class NetFromBuildInfo(nn.Module):
         
         
     def forward(self, x):
+        x = F.softmax(self.model(x), dim=-1)
+        return x
+
+    def logits_forward(self, x):
         x = self.model(x)
         return x
 
