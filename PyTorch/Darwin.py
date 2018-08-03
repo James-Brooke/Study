@@ -2,6 +2,7 @@ import torch
 import random
 import copy
 import requests #for sending updates to my phone via telegram
+import os
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -91,13 +92,12 @@ def mutate_net(nnet, layer_space, net_space):
                     net['layers'].pop()
 
                 
-            # value & id update
             net['nb_layers'] = len(net['layers'])         
             
     return net
 
 class Flatten(nn.Module):
-    """Flattens input to vector size (batchsize, 1)
+    """Flattens input to vector
     (for use in NetFromBuildInfo).
     """
 
@@ -250,7 +250,7 @@ class TournamentOptimizer:
     """Define a tournament play selection process."""
 
     def __init__(self, population_sz, layer_space, net_space, init_fn, mutate_fn, builder_fn,
-                 train_fn, test_fn, data_loader, test_loader, adv_func, telegram_credentials):
+                 train_fn, test_fn, data_loader, test_loader, adv_func, telegram_credentials, RUN):
         
         self.init_fn = init_fn
         self.layer_space = layer_space
@@ -265,6 +265,7 @@ class TournamentOptimizer:
         self.adv_func = adv_func
         self.bot_token = telegram_credentials[0]
         self.bot_channel = telegram_credentials[1]
+        self.run = RUN
         
         torch.manual_seed(1)
         
@@ -298,7 +299,7 @@ class TournamentOptimizer:
             self.children = []
             
 
-            self.train_nets(save=save, epochs=epochs)
+            self.train_nets(run=self.run, save=save, epochs=epochs)
             self.evaluate_nets()
 
             mean = np.mean(self.test_results[self.generation]['correct'])
@@ -360,7 +361,7 @@ class TournamentOptimizer:
 
         
         
-    def train_nets(self, save=True, epochs=5):
+    def train_nets(self, run, save=True, epochs=5):
         """trains population of nets"""
          
         for i, net in enumerate(tqdm_notebook(self.population)):
@@ -369,8 +370,11 @@ class TournamentOptimizer:
                 self.train(net, self.dataloader, net.optimizer, epoch)
                 
             if save:
-                fp = r"D:\Models\NeuroEvolution/{}-{}".format(self.generation, i)
-                torch.save(net.state_dict(), fp)
+                fp = r"D:\Models\NeuroEvolution/Run{}".format(run)
+                if not os.path.exists(fp):
+                    os.mkdir(fp)
+                    print('directory created: ', fp)
+                torch.save(net.state_dict(), fp+"/{}-{}".format(self.generation, i))
                 
                 
     def evaluate_nets(self):
@@ -575,9 +579,9 @@ def avgplotter(optimizer):
             ax.scatter(j, holder[list(holder.keys())[i]][j], c='black')
 
 
-def rebuild_from_save(optimizer, generation, position, run=None):
+def rebuild_from_save(optimizer, generation, position, run, oldrun=False):
 
-    if run:
+    if oldrun:
         df= pd.read_pickle('../data/neuroevolution{}'.format(run))
         if run == 2:
             popnums = [j for i in range(100) for j in range(30)] #100 generations in run 2
@@ -588,22 +592,22 @@ def rebuild_from_save(optimizer, generation, position, run=None):
         genome = df[(df['Generation']==generation)&(df['Popnum']==position)].iloc[0,-2]
         print(genome)
         net = NetFromBuildInfo(genome)
-        net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\run{}/{}-{}".format(run, generation, position)))
+        net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\Run{}/{}-{}".format(run, generation, position)))
 
     else:
         genome = optimizer.genome_history[generation][position]
         net = NetFromBuildInfo(genome)
-        net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\{}-{}".format(generation, position)))
+        net.load_state_dict(torch.load(r"D:\Models\NeuroEvolution\Run{}/{}-{}".format(run, generation, position)))
     
     return net.cuda()
 
-def sanity_check(optimizer, test_loader):
+def sanity_check(optimizer, test_loader, run):
     
     for generation in optimizer.test_results:
         print('generation {}: \n'.format(generation))
         for i, result in enumerate(optimizer.test_results[generation]['correct']):
             
-            mod = rebuild_from_save(optimizer, generation, i)
+            mod = rebuild_from_save(optimizer, generation, i, run)
             _, rebuild_result = test(mod, test_loader, adversarial=True, eps=0.5)
             
             if result == rebuild_result:
@@ -612,7 +616,7 @@ def sanity_check(optimizer, test_loader):
                 print("result = {}, rebuild result = {}. (different!!)".format(result, rebuild_result))
 
 
-def get_best_model(optimizer, adversarial=True):
+def get_best_model(optimizer, run, adversarial=True):
     current_best = 0
     for i, gen in enumerate(optimizer.test_results):
         if adversarial: 
@@ -627,30 +631,30 @@ def get_best_model(optimizer, adversarial=True):
     clean_score = optimizer.test_results[best_gen]['clean_correct'][best_pos]
     adv_score = optimizer.test_results[best_gen]['correct'][best_pos]
                 
-    return [best_gen, clean_score, adv_score, rebuild_from_save(optimizer, best_gen, best_pos)]
+    return [best_gen, clean_score, adv_score, rebuild_from_save(optimizer, best_gen, best_pos, run)]
 
-def best_printer(optimizer):
+def best_printer(optimizer, run):
     holdict = {}
     holdict['best_clean'] = {}
     holdict['best_adversarial'] = {}
     
     holdict['best_clean']['generation'] , \
     holdict['best_clean']['clean'], \
-    holdict['best_clean']['adversarial'], _ = get_best_model(optimizer, adversarial=False)
+    holdict['best_clean']['adversarial'], _ = get_best_model(optimizer, run, adversarial=False)
     
     holdict['best_adversarial']['generation'] , \
     holdict['best_adversarial']['clean'], \
-    holdict['best_adversarial']['adversarial'], _ = get_best_model(optimizer, adversarial=True)
+    holdict['best_adversarial']['adversarial'], _ = get_best_model(optimizer, run, adversarial=True)
     
     return pd.DataFrame(holdict).T
 
-def multi_plot(optimizer, data_loader, adv_func=None, adversarial=False, eps=0.5, model=None):
+def multi_plot(optimizer, data_loader, run, adv_func=None, adversarial=False, eps=0.5, model=None):
     
     if model:
         best_model=model
     else:
 
-        best_gen, best_clean_score, best_adv_score, best_model = get_best_model(optimizer)
+        best_gen, best_clean_score, best_adv_score, best_model = get_best_model(optimizer, run)
         
         print("Showing best model which was found in generation {}\n"
             "Clean accuracy = {}\nadversarial accuracy ={}\n\n"
