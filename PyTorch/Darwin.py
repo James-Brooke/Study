@@ -373,7 +373,7 @@ class TournamentOptimizer:
                 fp = r"D:\Models\NeuroEvolution/Run{}".format(run)
                 if not os.path.exists(fp):
                     os.mkdir(fp)
-                    print('directory created: ', fp)
+                    print('Directory created: ', fp)
                 torch.save(net.state_dict(), fp+"/{}-{}".format(self.generation, i))
                 
                 
