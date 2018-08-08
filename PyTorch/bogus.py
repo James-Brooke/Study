@@ -16,11 +16,15 @@ class atk:
             self.grads[name] = grad
         return hook
 
-    def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1, debug=None): #https://arxiv.org/pdf/1412.6572.pdf
+    def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1, debug=None, single=None): #https://arxiv.org/pdf/1412.6572.pdf
 
         criterion = torch.nn.CrossEntropyLoss()
         
-        x_adv = Variable(x.data, requires_grad=True).cuda().double() #clean image
+        if single is None:
+            x_adv = Variable(x.data, requires_grad=True).cuda().double() #clean image
+        else:
+            x_adv = Variable(x.data, requires_grad=True).cuda()
+            
         x_adv.register_hook(self.save_grad('x_adv'))
 
         h_adv = model.logits_forward(x_adv) / 100 #clean logits (division to prevent underflow) 

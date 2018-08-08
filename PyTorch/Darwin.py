@@ -428,7 +428,7 @@ def progressplotter(optimizer, clean=False):
         
     ax.set_xticks(np.arange(0, len(means),1))
     ax.set_xlabel('Generation')
-    ax.set_ylabel('Correct classifications')
+    ax.set_ylabel('Correct classifications (%)' )
     
     if clean:
         ax.set_title('Accuracy on clean dataset')
