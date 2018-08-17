@@ -18,7 +18,7 @@ class atk:
 
     def fgsm(self, model, x, y, eps=0.3, x_val_min=0, x_val_max=1, debug=None, single=None): #https://arxiv.org/pdf/1412.6572.pdf
 
-        criterion = torch.nn.CrossEntropyLoss()
+        criterion = F.cross_entropy
         
         if single is None:
             x_adv = Variable(x.data, requires_grad=True).cuda().double() #clean image
